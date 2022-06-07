@@ -66,7 +66,17 @@ void FileMerger::MergeSortFiles() {
     }
   }
   if (files_to_merge_.size() == 0) {
-    std::cout << "No input files in given directory " << input_folder_path_ <<  std::endl;
+    std::cout << "No input files in given directory " << input_folder_path_
+              << std::endl;
+    return;
+  }
+  std::cout << "Merging started..." << std::endl;
+  if (files_to_merge_.size() == 1) {
+    std::experimental::filesystem::copy_file(files_to_merge_.back(),
+                                             output_file_path_);
+    std::cout << "Input directory only contained a single file and is copied "
+                 "to output file."
+              << std::endl;
     return;
   }
   std::experimental::filesystem::create_directory(temp_storage_);

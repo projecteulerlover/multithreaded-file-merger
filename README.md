@@ -55,4 +55,4 @@ The directories `tests/data/test_0` and `tests/data/test_1` contain tests for
 the tool's business logic.
 
 The directory `tests/data/large_test` contains 10 test folders with 10657 words
-each.
+total.
