@@ -65,6 +65,17 @@
     "xtree": "cpp",
     "xutility": "cpp",
     "fstream": "cpp",
-    "iostream": "cpp"
+    "iostream": "cpp",
+    "condition_variable": "cpp",
+    "coroutine": "cpp",
+    "resumable": "cpp",
+    "functional": "cpp",
+    "future": "cpp",
+    "mutex": "cpp",
+    "random": "cpp",
+    "stop_token": "cpp",
+    "thread": "cpp",
+    "unordered_map": "cpp",
+    "xhash": "cpp"
   }
 }

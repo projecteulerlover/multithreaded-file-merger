@@ -4,38 +4,57 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <list>
 #include <memory>
 #include <string>
-
-namespace {
-constexpr int kBufferSize = 1024;
-}
+#include <thread>
+#include <algorithm>
+#include <random>
+#include <mutex>
 
 void FileMerger::MergeSortFiles() {
   auto directory_itr = std::filesystem::directory_iterator(input_folder_path_);
-  std::list<std::string> file_paths_to_combine;
+  std::vector<std::string> files_to_merge_;
   for (const auto& file : directory_itr) {
     if (!file.is_directory() && file.path().string() != output_file_path_) {
-      file_paths_to_combine.push_back(file.path().string());
+      files_to_merge_.push_back(file.path().string());
     }
   }
-  int temp_index = 0;
-  while (file_paths_to_combine.size() > 1) {
-    std::string in_file_path_1 = file_paths_to_combine.front();
-    file_paths_to_combine.pop_front();
-    std::string in_file_path_2 = file_paths_to_combine.front();
-    file_paths_to_combine.pop_front();
-    std::string out_file_path = file_paths_to_combine.empty()
-                                    ? output_file_path_
-                                    : temp_storage_ +
-                                          std::to_string(temp_index++) + ".txt";
+  for(int i = 0; i < max_threads_; ++i) {
+      thread_pool_.emplace_back(&FileMerger::ThreadPoolWorker, this, &MergeSortFiles);
+  }
+  for(auto& t : thread_pool_){
+      t.join();
+  }
+  std::filesystem::remove_all(temp_storage_);
+}
+
+void FileMerger::ThreadPoolWorker() {
+  while (true) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    cv_.wait(lock, [&]() {
+      return files_to_merge_.size() > 1 || completed_;
+    });
+    if (completed_) {
+      return;
+    }
+    ++working_threads_;
+    // At least two files to combine.
+    std::string in_file_path_1 = files_to_merge_.back();
+    files_to_merge_.pop_back();
+    std::string in_file_path_2 = files_to_merge_.back();
+    files_to_merge_.pop_back();
+    std::string out_file_path =
+        files_to_merge_.empty()
+            ? output_file_path_
+            : temp_storage_ + std::to_string(temp_index_++) + ".txt";
     std::cout << "Merge sorting files " << in_file_path_1 << " and "
               << in_file_path_2 << " into " << out_file_path << "\n";
+    lock.unlock();
     MergeSortTwoFiles(in_file_path_1, in_file_path_2, out_file_path);
-    file_paths_to_combine.push_back(out_file_path);
+    DeleteTemporaryFile(in_file_path_1);
+    DeleteTemporaryFile(in_file_path_2);
+    files_to_merge_.push_back(out_file_path);
   }
-  std::filesystem::remove_all("myDirectory");
 }
 
 std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
@@ -47,6 +66,7 @@ std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
 
   std::ofstream out_file;
   out_file.open(out_file_path);
+
   std::string token_1, token_2, last_write;
   std::getline(in_1, token_1, '\n');
   std::getline(in_2, token_2, '\n');
@@ -87,4 +107,11 @@ std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
   in_2.close();
   out_file.close();
   return out_file_path;
+}
+
+void FileMerger::DeleteTemporaryFile(const std::string& file_path) {
+  if (delete_temporary_ &&
+      file_path.compare(0, temp_storage_.size(), temp_storage_) == 0) {
+    std::filesystem::remove(file_path);
+  }
 }

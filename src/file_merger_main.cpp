@@ -12,22 +12,3 @@ int main(int argc, char** argv) {
   merger.MergeSortFiles();
   return EXIT_SUCCESS;
 }
-
-/*
-# Merge Sort Files Tool
-
-An implementation of a file merging tool which when given a directory containing
-new line character delimited text files, aggregates all tokens into a single new
-line character delimited text file. Duplicate tokens across all files should
-appear a single time, and empty tokens are ignored.
-
-## Usage
-1. Compile with
-2. Run with .\output\main {fully qualified input files folder} {fully qualified
-output file}
-3. {fully qualified output file} contains the combined unique merge sorted
-tokens.
-
-## Implementation
-
-*/
