@@ -1,0 +1,8 @@
+apple
+apple banana
+banana
+cactus
+dinosaur
+frankfurter
+zz
+z

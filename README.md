@@ -7,12 +7,21 @@ appear a single time, and empty tokens are ignored.
 
 Deals with the following scaled up situation
 1. many large files, which cannot be held in memory
+
 2. the aggregate file could be held in disk.
 
-## Usage
+## Usaged
 1. Compile with
+```
+g++ file_merger_main.cpp -o file_merger_main.out file_merger.cpp file_merger.h -std=c++17 -Wall -Wextra -g -lstdc++fs -lpthread
+```
+
 2. Run with .\output\main {fully qualified input files folder} {fully qualified
-output file}
+output file}, e.g.
+```
+./file_merger_main.out /home/kan/repos/multithreaded-file-merger/tests/data/large_test /home/kan/repos/multithreaded-file-merger/tests/data/large_test_merged_files.txt
+```
+
 3. {fully qualified output file} contains the combined unique merge sorted
 tokens.
 
@@ -32,6 +41,18 @@ instead written to {fully qualified output file}.
 ## Assumptions
 1. No other tool is using the same disk location (input, output, and temp files
 are not locked while aggregating).
+
 2. Does not attempt to do error handling for misreads/miswrites.
+
 3. The disk can hold all the input files and the merged file at the same time.
 At most 2x the size of the input files are stored simultaneously.
+
+## Tests
+
+Three test sets have been included.
+
+The directories `tests/data/test_0` and `tests/data/test_1` contain tests for 
+the tool's business logic.
+
+The directory `tests/data/large_test` contains 10 test folders with 10657 words
+each.

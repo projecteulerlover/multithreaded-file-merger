@@ -36,7 +36,7 @@ void FileMerger::ThreadPoolWorker(const int thread_number) {
     std::string in_file_path_2 = files_to_merge_.back();
     files_to_merge_.pop_back();
     std::string out_file_path =
-        files_to_merge_.empty()
+        files_to_merge_.empty() && working_threads_ == 1
             ? output_file_path_
             : temp_storage_ + std::to_string(temp_index_++) + ".txt";
     std::cout << "Thread #" << thread_number << " merging sorted files "
@@ -63,9 +63,13 @@ void FileMerger::MergeSortFiles() {
   for (const auto& file : directory_itr) {
     if (!is_directory(file) && file.path().string() != output_file_path_) {
       files_to_merge_.push_back(file.path().string());
-      std::cout << files_to_merge_.back() << std::endl;
     }
   }
+  if (files_to_merge_.size() == 0) {
+    std::cout << "No input files in given directory " << input_folder_path_ <<  std::endl;
+    return;
+  }
+  std::experimental::filesystem::create_directory(temp_storage_);
   for (int i = 0; i < max_threads_; ++i) {
     thread_pool_.emplace_back(&FileMerger::ThreadPoolWorker, this, i);
   }
@@ -75,6 +79,7 @@ void FileMerger::MergeSortFiles() {
   if (delete_temporary_) {
     std::experimental::filesystem::remove_all(temp_storage_);
   }
+  std::cout << "Merging complete." << std::endl;
 }
 
 std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
@@ -113,7 +118,7 @@ std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
   }
   do {
     Writer(out_file, token_1, last_write);
-  } while (getline(in_2, token_2, '\n'));
+  } while (getline(in_1, token_1, '\n'));
   do {
     Writer(out_file, token_2, last_write);
   } while (getline(in_2, token_2, '\n'));
