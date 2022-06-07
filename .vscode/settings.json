@@ -76,6 +76,14 @@
     "stop_token": "cpp",
     "thread": "cpp",
     "unordered_map": "cpp",
-    "xhash": "cpp"
+    "xhash": "cpp",
+    "string_view": "cpp",
+    "cstdarg": "cpp",
+    "cwctype": "cpp",
+    "*.tcc": "cpp",
+    "codecvt": "cpp",
+    "memory_resource": "cpp",
+    "numeric": "cpp",
+    "cinttypes": "cpp"
   }
 }

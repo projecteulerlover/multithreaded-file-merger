@@ -1,39 +1,31 @@
 #include "file_merger.h"
 
+#include <algorithm>
 #include <cstring>
-#include <filesystem>
+#include <experimental/filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <random>
 #include <string>
 #include <thread>
-#include <algorithm>
-#include <random>
-#include <mutex>
 
-void FileMerger::MergeSortFiles() {
-  auto directory_itr = std::filesystem::directory_iterator(input_folder_path_);
-  std::vector<std::string> files_to_merge_;
-  for (const auto& file : directory_itr) {
-    if (!file.is_directory() && file.path().string() != output_file_path_) {
-      files_to_merge_.push_back(file.path().string());
-    }
+namespace {
+void Writer(std::ofstream& out_file, std::string& line,
+            std::string& last_line) {
+  if (!line.empty() && line != last_line) {
+    out_file << line << "\n";
+    last_line = std::move(line);
   }
-  for(int i = 0; i < max_threads_; ++i) {
-      thread_pool_.emplace_back(&FileMerger::ThreadPoolWorker, this, &MergeSortFiles);
-  }
-  for(auto& t : thread_pool_){
-      t.join();
-  }
-  std::filesystem::remove_all(temp_storage_);
 }
+}  // namespace
 
-void FileMerger::ThreadPoolWorker() {
+void FileMerger::ThreadPoolWorker(const int thread_number) {
   while (true) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    cv_.wait(lock, [&]() {
-      return files_to_merge_.size() > 1 || completed_;
-    });
+    std::unique_lock<std::mutex> u_lock(mutex_);
+    cv_.wait(u_lock,
+             [&]() { return files_to_merge_.size() > 1 || completed_; });
     if (completed_) {
       return;
     }
@@ -47,13 +39,41 @@ void FileMerger::ThreadPoolWorker() {
         files_to_merge_.empty()
             ? output_file_path_
             : temp_storage_ + std::to_string(temp_index_++) + ".txt";
-    std::cout << "Merge sorting files " << in_file_path_1 << " and "
-              << in_file_path_2 << " into " << out_file_path << "\n";
-    lock.unlock();
+    std::cout << "Thread #" << thread_number << " merging sorted files "
+              << in_file_path_1 << " and " << in_file_path_2 << " into "
+              << out_file_path << "\n"
+              << std::endl;
+    u_lock.unlock();
     MergeSortTwoFiles(in_file_path_1, in_file_path_2, out_file_path);
-    DeleteTemporaryFile(in_file_path_1);
-    DeleteTemporaryFile(in_file_path_2);
+
+    u_lock.lock();
+
     files_to_merge_.push_back(out_file_path);
+    --working_threads_;
+    if (working_threads_ == 0 && files_to_merge_.size() <= 1) {
+      completed_ = true;
+    }
+    cv_.notify_all();
+  }
+}
+
+void FileMerger::MergeSortFiles() {
+  auto directory_itr =
+      std::experimental::filesystem::directory_iterator(input_folder_path_);
+  for (const auto& file : directory_itr) {
+    if (!is_directory(file) && file.path().string() != output_file_path_) {
+      files_to_merge_.push_back(file.path().string());
+      std::cout << files_to_merge_.back() << std::endl;
+    }
+  }
+  for (int i = 0; i < max_threads_; ++i) {
+    thread_pool_.emplace_back(&FileMerger::ThreadPoolWorker, this, i);
+  }
+  for (auto& t : thread_pool_) {
+    t.join();
+  }
+  if (delete_temporary_) {
+    std::experimental::filesystem::remove_all(temp_storage_);
   }
 }
 
@@ -70,39 +90,34 @@ std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
   std::string token_1, token_2, last_write;
   std::getline(in_1, token_1, '\n');
   std::getline(in_2, token_2, '\n');
-  while (in_1 && in_2) {
-    if (token_1 == "") {
+  while (!in_1.eof() && !in_2.eof()) {
+    if (token_1.empty()) {
       std::getline(in_1, token_1, '\n');
       continue;
     }
-    if (token_2 == "") {
+    if (token_2.empty()) {
       std::getline(in_2, token_2, '\n');
       continue;
     }
-    int cmp = strcmp(token_1.c_str(), token_2.c_str());
+    int cmp = token_1.compare(token_2);
     if (cmp <= 0) {
-      if (token_1 != last_write) {
-        out_file << token_1 << "\n";
-        last_write = std::move(token_1);
-      }
+      Writer(out_file, token_1, last_write);
       std::getline(in_1, token_1, '\n');
       if (cmp == 0) {
         std::getline(in_2, token_2, '\n');
       }
     } else {
-      if (token_2 != last_write) {
-        out_file << token_2 << "\n";
-        last_write = std::move(token_2);
-      }
+      Writer(out_file, token_2, last_write);
       std::getline(in_2, token_2, '\n');
     }
   }
-  while (std::getline(in_1, token_1, '\n')) {
-    out_file << token_1 << '\n';
-  }
-  while (std::getline(in_2, token_2, '\n')) {
-    out_file << token_2 << '\n';
-  }
+  do {
+    Writer(out_file, token_1, last_write);
+  } while (getline(in_2, token_2, '\n'));
+  do {
+    Writer(out_file, token_2, last_write);
+  } while (getline(in_2, token_2, '\n'));
+
   in_1.close();
   in_2.close();
   out_file.close();
@@ -112,6 +127,6 @@ std::string FileMerger::MergeSortTwoFiles(const std::string& in_file_path_1,
 void FileMerger::DeleteTemporaryFile(const std::string& file_path) {
   if (delete_temporary_ &&
       file_path.compare(0, temp_storage_.size(), temp_storage_) == 0) {
-    std::filesystem::remove(file_path);
+    std::experimental::filesystem::remove(file_path);
   }
 }
