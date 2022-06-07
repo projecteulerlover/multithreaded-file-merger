@@ -1,0 +1,10 @@
+abcd
+apple
+apple banana
+banana
+cactus
+dcf
+dinosaur
+frankfurter
+zzzzz
+z
