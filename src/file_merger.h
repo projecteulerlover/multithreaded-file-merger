@@ -18,7 +18,6 @@ class FileMerger {
         output_file_path_(output_file_path),
         delete_temporary_(delete_temporary) {
     temp_storage_ = input_folder_path_ + "/temp/";
-    max_threads_ = std::thread::hardware_concurrency();
   };
 
   // Uniquely merge sorts all lines in all files in the given
@@ -49,7 +48,7 @@ class FileMerger {
   void DeleteTemporaryFile(const std::string &file_path);
 
   // Multithreading member variables.
-  int max_threads_;
+  const int max_threads_ = std::thread::hardware_concurrency();
   int working_threads_ = 0;
   std::mutex mutex_;
   std::condition_variable cv_;
